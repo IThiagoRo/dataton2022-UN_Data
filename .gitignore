@@ -132,4 +132,5 @@ dmypy.json
 *.swp
 
 # dbs 
-BW-vectors-300-min5.txt
+src/Data/archivos_auxiliares/SBW-vectors-300-min5.txt
+
