@@ -130,3 +130,6 @@ dmypy.json
 
 # swp files 
 *.swp
+
+# dbs 
+BW-vectors-300-min5.txt
