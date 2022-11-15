@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import nltk
 from nltk import FreqDist
+from datetime import date
 import re
 
 import collections
@@ -202,6 +203,12 @@ def classifier_for_word_category(db_news, textUrl):
     #print(data_count_categorys2[columnas2])
     return data_count_categorys, data_count_categorys2, columnas2
 
+def clean_time(texto):
+    nuevo_texto = texto.lower()
+    nuevo_texto = re.sub("-", ' ', nuevo_texto)
+    nuevo_texto = nuevo_texto.split(sep = ' ')
+    nuevo_texto = [token for token in nuevo_texto if len(token) >1]
+    return(nuevo_texto)
 
 def classifier_for_clientCorporative(db_clients, db_clients_News, data_count_categorys, columnas2):
     data_result = pd.DataFrame()
@@ -290,13 +297,14 @@ def classifier(data_result_final):
     print(len(clasification))
 
     db_clasifier2 = pd.DataFrame()
-    db_clasifier2['UN_Data'] = db_teamName
-    db_clasifier2['nit'] = nit
-    db_clasifier2['id_new'] = id_new
-    db_clasifier2['participacion'] = particip
-    db_clasifier2['recomendacion'] = clasification
+    db_clasifier2['nit']=nit
+    db_clasifier2['news_id']=id_new
+    db_clasifier2['participation']=particip
+    db_clasifier2['clasification']=clasification
+    db_clasifier2
     
-    db_clasifier2.to_csv("../Data/Output/recomendacion.csv", index=False)
+    db_clasifier2.to_csv("../Data/Output/categorizacion.csv", index=False)
+    return db_clasifier2
 
 def data():
     db_clients = pd.read_csv("../Data/archivos_auxiliares/clientes.csv", encoding="latin-1")
@@ -364,4 +372,60 @@ if __name__ == '__main__':
     data_result_final = pd.merge(db_clients[["nit", "nombre"]], data_result_final_aux, on = "nit")
     
     print(data_result_final)
-    classifier(data_result_final)
+    db_clasifier2 = classifier(data_result_final)
+
+
+    diff_days=[]
+    ind_date=[]
+    for i in range(0, data_result_final.shape[0]):
+        fin=clean_time(data_result_final['news_final_date'][i])
+        future_date = date(int(2022), int(8), int(30))
+        today = date(int(fin[0]), int(fin[1]), int(fin[2]))
+        remaining_days = (future_date - today).days
+        diff_days.append(remaining_days)
+        ind_date.append(1 - (remaining_days / (31)))
+
+    score=[]
+    db_clasifier2["pesoFecha"]=ind_date
+    peso=0
+    score=[]
+    db_clasifier2["pesoFecha"]=ind_date
+    peso=0
+    for i in range(0, db_clasifier2.shape[0]):
+      
+      if db_clasifier2['participation'][i]=='Cliente':
+            pesoParticipacion=2
+      elif db_clasifier2['participation'][i]=='Sector':
+            pesoParticipacion=1
+      else:
+            pesoParticipacion=0.5
+      
+      if db_clasifier2['clasification'][i]=='alianzas':
+            pesoCategoria=1.4
+      elif db_clasifier2['clasification'][i]=='macroeconomía':
+            pesoCategoria=2
+      elif db_clasifier2['clasification'][i]=='reputación':
+            pesoCategoria=1.2
+      elif db_clasifier2['clasification'][i]=='sostenibilidad':
+            pesoCategoria=1.8
+      elif db_clasifier2['clasification'][i]=='regulaciones':
+            pesoCategoria=1.6
+      elif db_clasifier2['clasification'][i]=='innovación':
+            pesoCategoria=1.7
+      else:
+            pesoCategoria=0
+      
+      if db_clasifier2["pesoFecha"][i]>0:
+            peso=1
+
+      num=(pesoParticipacion*pesoCategoria) + peso
+      score.append(num)
+
+    db_clasifier2['score']=score
+    db_clasifier2
+    recomendador = db_clasifier2.sort_values('score',ascending=False)
+    recomendador["score"] = np.arange(1,len(recomendador)+1)
+    recomendador.head()
+    recomendador.rename(columns={'participation':'participacion', 'clasification':'categoria', 'score':'recomendacion'}, inplace=True)
+    recomendador.drop('pesoFecha', inplace=True, axis=1)
+    recomendador.to_csv("../Data/Output/recomendacion.csv", index=False)
